@@ -1,43 +1,76 @@
 import streamlit as st
 
-def calculate_mortar_mix(es_scnl, total_weight=1000, target_es=50, es_scl=77):
-    if es_scnl >= target_es:
-        scl_ratio = 0
-        scnl_ratio = 1
-    else:
-        scl_ratio = (target_es - es_scnl) / (es_scl - es_scnl)
-        scnl_ratio = 1 - scl_ratio
-        if scl_ratio > 0.3:
-            st.warning("⚠️ Le sable lavé nécessaire dépasse 30%. Pensez à une source plus propre.")
-
-    sand_weight = total_weight * 0.7
-    scnl_kg = round(sand_weight * scnl_ratio, 2)
-    scl_kg = round(sand_weight * scl_ratio, 2)
-
-    mix = {
-        "SCNL (Sable Concassé Non Lavé)": f"{scnl_kg} kg",
-        "SCL (Sable Lavé)": f"{scl_kg} kg",
-        "CEM II 42.5": f"{total_weight * 0.26:.2f} kg",
-        "Chaux Hydratée": f"{total_weight * 0.04:.2f} kg",
-        "HPMC (Cellulose Ether)": f"{total_weight * 0.006:.2f} kg",
-        "RDP (Poudre Polymère)": f"{total_weight * 0.008:.2f} kg",
-        "Superplastifiant (PCE)": f"{total_weight * 0.0025:.2f} kg",
-        "Fibres PP (Optionnelles)": f"{total_weight * 0.001:.2f} kg",
-        "Retardateur (Usage Été)": f"{total_weight * 0.0005:.2f} kg"
-    }
-
-    st.subheader("🔧 Recette Optimale pour 1 Tonne de Mortier Projeté:")
-    for k, v in mix.items():
-        st.write(f"- {k}: {v}")
+def calculate_mortar_mix(total_weight, cement_percent, lime_percent, hpmc_percent):
+    # Calculate weights for each component
+    cement_kg = round(total_weight * cement_percent / 100, 2)
+    lime_kg = round(total_weight * lime_percent / 100, 2)
+    hpmc_kg = round(total_weight * hpmc_percent / 100, 2)
+    
+    # Calculate crushed sand as remainder
+    sand_percent = 100 - cement_percent - lime_percent - hpmc_percent
+    sand_kg = round(total_weight * sand_percent / 100, 2)
+    
+    # Display the mix breakdown
+    st.subheader("🔧 Cost-Effective Spray Mortar Recipe:")
+    st.write(f"**Total Batch Weight:** {total_weight} kg")
+    st.write("---")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.write("**Component**")
+        st.write("Cement")
+        if lime_percent > 0:
+            st.write("Lime (optional)")
+        st.write("HPMC (Cellulose Ether)")
+        st.write("Mined Crushed Sand")
+        
+    with col2:
+        st.write("**Weight**")
+        st.write(f"{cement_kg} kg ({cement_percent}%)")
+        if lime_percent > 0:
+            st.write(f"{lime_kg} kg ({lime_percent}%)")
+        st.write(f"{hpmc_kg} kg ({hpmc_percent}%)")
+        st.write(f"{sand_kg} kg ({sand_percent}%)")
+    
+    # Show total verification
+    total_calculated = cement_kg + lime_kg + hpmc_kg + sand_kg
+    st.write("---")
+    st.write(f"**Total Calculated:** {total_calculated} kg")
 
 # Streamlit UI
 st.set_page_config(page_title="Spray Mortar Calculator", layout="centered")
-st.title("🧱 Calculateur Mortier Projeté")
-st.caption("Optimise ta recette selon l'indice ES du sable – by Omar 🇲🇦")
+st.title("🧱 Spray Mortar Calculator")
+st.caption("Cost-effective minimalist recipe for façade/wall renders")
 
-es_value = st.slider("🧪 Valeur ES du Sable Actuel", 30, 77, 40)
-target_es = st.slider("🎯 ES Ciblé", 45, 55, 50)
-total_batch = st.number_input("⚖️ Poids Total du Mélange (kg)", value=1000)
+st.markdown("### Mix Configuration")
 
-if st.button("Calculer la Recette"):
-    calculate_mortar_mix(es_scnl=es_value, total_weight=total_batch, target_es=target_es)
+# Input controls for batch weight and percentages
+total_batch = st.number_input("Total Batch Weight (kg)", value=1000, min_value=1, step=1)
+
+col1, col2 = st.columns(2)
+
+with col1:
+    cement_percent = st.slider("Cement %", 10.0, 40.0, 25.0, 0.5)
+    lime_percent = st.slider("Lime % (optional)", 0.0, 10.0, 3.0, 0.5)
+    
+with col2:
+    hpmc_percent = st.slider("HPMC (Cellulose Ether) %", 0.1, 2.0, 0.6, 0.1)
+    
+    # Calculate and display remaining percentage for sand
+    remaining = 100 - cement_percent - lime_percent - hpmc_percent
+    st.metric("Crushed Sand %", f"{remaining:.1f}%")
+
+# Validation
+if remaining < 0:
+    st.error("⚠️ Total percentages exceed 100%. Please adjust the values.")
+elif remaining < 40:
+    st.warning("⚠️ Sand percentage is quite low. Consider reducing other components.")
+
+st.write("---")
+
+if st.button("Calculate Recipe"):
+    if remaining >= 0:
+        calculate_mortar_mix(total_batch, cement_percent, lime_percent, hpmc_percent)
+    else:
+        st.error("Cannot calculate: Total percentages exceed 100%")
