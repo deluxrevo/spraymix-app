@@ -2,17 +2,26 @@ import streamlit as st
 
 # --- ES Calculation Helper ---
 def calculate_es(sieve_percentages):
-    # Example ES logic: weighted sum of key sieves (you can adjust this)
-    # ES = 0.25*A + 0.25*B + 0.5*C, for A/B/C as user-specified sieves
-    # Here: [2mm, 1mm, 0.5mm, 0.25mm, 0.125mm, 0.063mm, pan]
-    # Typical European norm: ES = sum of % retained on 0.5mm + 0.25mm + 0.125mm
+    # ES = sum of % retained on 0.25mm + 0.125mm + 0.063mm (commonly used norm)
     if len(sieve_percentages) < 7:
         return None
     try:
-        es = sieve_percentages[3] + sieve_percentages[4] + sieve_percentages[5]  # 0.25mm + 0.125mm + 0.063mm
+        es = sieve_percentages[3] + sieve_percentages[4] + sieve_percentages[5]
         return round(es, 1)
     except Exception:
         return None
+
+# --- Sand Blending Calculator ---
+def sand_blend_ratio(es_unclean, es_clean, es_target):
+    if es_clean == es_unclean:
+        return 0, 1, "Clean and unclean sand have the same ES. Any ratio is OK."
+    elif es_target <= es_unclean:
+        return 0, 1, "Your unclean sand already meets or exceeds the target ES! No clean sand needed."
+    else:
+        ratio_clean = (es_target - es_unclean) / (es_clean - es_unclean)
+        ratio_clean = max(0, min(ratio_clean, 1))
+        ratio_unclean = 1 - ratio_clean
+        return ratio_clean, ratio_unclean, None
 
 # --- Main Mortar Mix Calculation ---
 def calculate_mortar_mix(total_weight, cement_percent, lime_percent, hpmc_percent):
@@ -48,7 +57,6 @@ def calculate_mortar_mix(total_weight, cement_percent, lime_percent, hpmc_percen
 
     # --- Minimum Norms Checks ---
     min_cement = 15  # example: 15% cement minimum
-    min_es = 45      # example: ES should be at least 45
     if cement_percent < min_cement:
         st.warning(f"⚠️ Cement percent is below the minimum norm ({min_cement}%).")
     if sand_percent < 50:
@@ -91,7 +99,7 @@ with st.expander("Open Sand Sieve Analysis Calculator"):
     default_vals = [2, 5, 18, 34, 26, 12, 3]
     sieve_percentages = []
     for idx, sieve in enumerate(sieves):
-        val = st.number_input(f"{sieve}", min_value=0.0, max_value=100.0, value=float(default_vals[idx]), step=0.1)
+        val = st.number_input(f"{sieve}", min_value=0.0, max_value=100.0, value=float(default_vals[idx]), step=0.1, key=f"sieve_{idx}")
         sieve_percentages.append(val)
     if st.button("Calculate ES Value"):
         es_value = calculate_es(sieve_percentages)
@@ -99,10 +107,37 @@ with st.expander("Open Sand Sieve Analysis Calculator"):
             st.success(f"**Calculated ES value:** {es_value}")
             if es_value < 45:
                 st.warning("⚠️ ES value is below recommended minimum for spray mortars (45). Consider adjusting sand blend.")
+            elif es_value > 55:
+                st.warning("⚠️ ES value is above the maximum for optimal workability (55). Consider adjusting sand blend.")
             else:
-                st.info("✅ ES value is within typical recommended range.")
+                st.info("✅ ES value is within the typical recommended range (45 - 55).")
         else:
             st.error("Could not calculate ES. Please check your inputs.")
 
 st.write("---")
+st.markdown("## 3️⃣ Sand Blending Calculator (Achieve Target ES)")
+
+st.write("""
+Enter the ES of your unclean (crushed) sand, the ES of your clean (washed) sand,
+and your target ES for mortar. Get the recommended blend ratio.
+""")
+col1, col2, col3 = st.columns(3)
+with col1:
+    es_unclean = st.number_input("Unclean Sand ES", min_value=0.0, max_value=100.0, value=40.0, step=0.1)
+with col2:
+    es_clean = st.number_input("Clean Sand ES", min_value=0.0, max_value=100.0, value=77.0, step=0.1)
+with col3:
+    es_target = st.number_input("Target ES", min_value=40.0, max_value=55.0, value=45.0, step=0.1)
+
+if st.button("Calculate Sand Blend"):
+    ratio_clean, ratio_unclean, message = sand_blend_ratio(es_unclean, es_clean, es_target)
+    if message:
+        st.info(message)
+    else:
+        st.markdown(f"**Mix {ratio_clean*100:.1f}% clean sand and {ratio_unclean*100:.1f}% unclean sand.**")
+        if ratio_clean > 0.3:
+            st.warning("⚠️ Clean sand required is above 30%. Consider finding a better unclean sand or using more clean sand.")
+
+st.write("---")
+st.info("**Recommended ES for mortar sand:** Minimum: 45, Maximum: 55. Most codes recommend staying within this range for proper workability and strength.")
 st.caption("For best results, ensure all components and sand grading meet your project's local norms and requirements.")
