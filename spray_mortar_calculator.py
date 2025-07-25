@@ -1,143 +1,107 @@
 import streamlit as st
 
-# --- ES Calculation Helper ---
-def calculate_es(sieve_percentages):
-    # ES = sum of % retained on 0.25mm + 0.125mm + 0.063mm (commonly used norm)
-    if len(sieve_percentages) < 7:
-        return None
-    try:
-        es = sieve_percentages[3] + sieve_percentages[4] + sieve_percentages[5]
-        return round(es, 1)
-    except Exception:
-        return None
+st.set_page_config(page_title="Mortier Pro – Coût & Fiche Technique", layout="centered")
 
-# --- Sand Blending Calculator ---
-def sand_blend_ratio(es_unclean, es_clean, es_target):
-    if es_clean == es_unclean:
-        return 0, 1, "Clean and unclean sand have the same ES. Any ratio is OK."
-    elif es_target <= es_unclean:
-        return 0, 1, "Your unclean sand already meets or exceeds the target ES! No clean sand needed."
-    else:
-        ratio_clean = (es_target - es_unclean) / (es_clean - es_unclean)
-        ratio_clean = max(0, min(ratio_clean, 1))
-        ratio_unclean = 1 - ratio_clean
-        return ratio_clean, ratio_unclean, None
+st.title("🧱 Mortier Sec Projétable – Calculateur Complet")
+st.caption("Par Omar 🇲🇦 — coût, dosage, fiche technique intégrée")
 
-# --- Main Mortar Mix Calculation ---
-def calculate_mortar_mix(total_weight, cement_percent, lime_percent, hpmc_percent):
-    cement_kg = round(total_weight * cement_percent / 100, 2)
-    lime_kg = round(total_weight * lime_percent / 100, 2)
-    hpmc_kg = round(total_weight * hpmc_percent / 100, 2)
-    sand_percent = 100 - cement_percent - lime_percent - hpmc_percent
-    sand_kg = round(total_weight * sand_percent / 100, 2)
+# 📥 Batch size input
+st.markdown("### ⚖️ Taille du lot")
+batch_kg = st.number_input("Taille du lot (kg)", min_value=25, value=1000, step=25)
 
-    st.subheader("🔧 Spray Mortar Recipe:")
-    st.write(f"**Total Batch Weight:** {total_weight} kg")
-    st.write("---")
+# 🧱 Material prices
+st.markdown("### 🔧 Prix des matériaux (MAD/tonne)")
+cement_price = st.number_input("💠 Ciment (CEM II 42.5)", value=1300)
+lime_price = st.number_input("🟩 Chaux aérienne", value=1800)
+sand_price = st.number_input("🪨 Sable ES 47", value=120)
+kaolin_price = st.number_input("🧼 Kaolin", value=150)
+hydrofuge_price = st.number_input("💊 Hydrofuge Sika® Poudre (MAD/kg)", value=12)
 
-    col1, col2 = st.columns(2)
-    with col1:
-        st.write("**Component**")
-        st.write("Cement")
-        if lime_percent > 0:
-            st.write("Lime (optional)")
-        st.write("HPMC (Cellulose Ether)")
-        st.write("Crushed Sand")
-    with col2:
-        st.write("**Weight**")
-        st.write(f"{cement_kg} kg ({cement_percent}%)")
-        if lime_percent > 0:
-            st.write(f"{lime_kg} kg ({lime_percent}%)")
-        st.write(f"{hpmc_kg} kg ({hpmc_percent}%)")
-        st.write(f"{sand_kg} kg ({sand_percent}%)")
+# 📦 Overhead costs
+st.markdown("### 📦 Coûts fixes (par tonne)")
+packaging_cost = st.number_input("📦 Emballage", value=150)
+labor_cost = st.number_input("👷 Main d'œuvre", value=100)
+transport_cost = st.number_input("🚚 Transport", value=150)
 
-    total_calc = cement_kg + lime_kg + hpmc_kg + sand_kg
-    st.write("---")
-    st.write(f"**Total Calculated:** {total_calc} kg")
+# ⚙️ Ratios based on batch
+cement_pct = 0.25
+lime_pct = 0.03
+kaolin_pct = 0.02
+sand_pct = 0.70
+hydrofuge_pct = 0.005  # 0.5% of cement
 
-    # --- Minimum Norms Checks ---
-    min_cement = 15  # example: 15% cement minimum
-    if cement_percent < min_cement:
-        st.warning(f"⚠️ Cement percent is below the minimum norm ({min_cement}%).")
-    if sand_percent < 50:
-        st.warning("⚠️ Sand content is quite low for spray mortars (recommended >50%).")
+cement_kg = batch_kg * cement_pct
+lime_kg = batch_kg * lime_pct
+kaolin_kg = batch_kg * kaolin_pct
+sand_kg = batch_kg * sand_pct
+hydrofuge_kg = cement_kg * 0.01
 
-# --- UI: Main Section ---
-st.set_page_config(page_title="Spray Mortar & ES Calculator", layout="centered")
-st.title("🧱 Spray Mortar & Sand ES Calculator")
-st.caption("Modern, cost-effective recipes with quality control tools – by Omar 🇲🇦")
+# 💰 Cost calculations
+material_cost = (
+    (cement_kg / 1000) * cement_price +
+    (lime_kg / 1000) * lime_price +
+    (kaolin_kg / 1000) * kaolin_price +
+    (sand_kg / 1000) * sand_price +
+    (hydrofuge_kg / 1000) * hydrofuge_price
+)
 
-st.markdown("## 1️⃣ Mortar Mix Configuration")
+fixed_costs = packaging_cost + labor_cost + transport_cost
+total_cost = material_cost + fixed_costs
 
-total_batch = st.number_input("Total Batch Weight (kg)", value=1000, min_value=1, step=1)
-col1, col2 = st.columns(2)
-with col1:
-    cement_percent = st.slider("Cement %", 10.0, 40.0, 25.0, 0.5)
-    lime_percent = st.slider("Lime % (optional)", 0.0, 10.0, 3.0, 0.5)
-with col2:
-    hpmc_percent = st.slider("HPMC (Cellulose Ether) %", 0.1, 2.0, 0.6, 0.1)
-    remaining = 100 - cement_percent - lime_percent - hpmc_percent
-    st.metric("Crushed Sand %", f"{remaining:.1f}%")
+# 📊 Output
+st.markdown("### 📊 Coût Total")
+st.write(f"💰 Coût total pour {batch_kg} kg : **{round(total_cost, 2)} MAD**")
+st.write(f"📦 ≈ **{round(total_cost / batch_kg * 25, 2)} MAD** par sac de 25 kg")
 
-if remaining < 0:
-    st.error("⚠️ Total percentages exceed 100%. Please adjust the values.")
-elif remaining < 40:
-    st.warning("⚠️ Sand percentage is quite low. Consider reducing other components.")
+# 📄 Fiche Technique
+with st.expander("📄 Voir la Fiche Technique"):
+    st.markdown(f"""
+**Nom du produit** : Mortier sec prêt à projeter — haute adhérence et imperméabilité  
+**Type** : Pré-mélange en poudre pour projection mécanique  
+**Conditionnement** : Sacs de 25 kg  
+**Stockage** : 12 mois à l’abri de l’humidité  
+**Aspect** : Poudre beige-gris  
+**Utilisation** : Façades, sous-enduits, murs intérieurs/extérieurs
 
-if st.button("Calculate Mortar Recipe"):
-    if remaining >= 0:
-        calculate_mortar_mix(total_batch, cement_percent, lime_percent, hpmc_percent)
-    else:
-        st.error("Cannot calculate: Total percentages exceed 100%")
+---
 
-st.write("---")
-st.markdown("## 2️⃣ ES Sand Calculator (Quality Control)")
+### 🧪 Composition (pour {batch_kg} kg)
 
-with st.expander("Open Sand Sieve Analysis Calculator"):
-    st.write("Enter your sand's sieve analysis (% retained on each):")
-    sieves = ["2 mm", "1 mm", "0.5 mm", "0.25 mm", "0.125 mm", "0.063 mm", "Pan"]
-    default_vals = [2, 5, 18, 34, 26, 12, 3]
-    sieve_percentages = []
-    for idx, sieve in enumerate(sieves):
-        val = st.number_input(f"{sieve}", min_value=0.0, max_value=100.0, value=float(default_vals[idx]), step=0.1, key=f"sieve_{idx}")
-        sieve_percentages.append(val)
-    if st.button("Calculate ES Value"):
-        es_value = calculate_es(sieve_percentages)
-        if es_value is not None:
-            st.success(f"**Calculated ES value:** {es_value}")
-            if es_value < 45:
-                st.warning("⚠️ ES value is below recommended minimum for spray mortars (45). Consider adjusting sand blend.")
-            elif es_value > 55:
-                st.warning("⚠️ ES value is above the maximum for optimal workability (55). Consider adjusting sand blend.")
-            else:
-                st.info("✅ ES value is within the typical recommended range (45 - 55).")
-        else:
-            st.error("Could not calculate ES. Please check your inputs.")
+| Composant                  | Quantité (kg)  | Rôle                            |
+|---------------------------|----------------|----------------------------------|
+| Sable ES 47               | {sand_kg:.1f}     | Granulat                        |
+| Ciment 42.5               | {cement_kg:.1f}   | Résistance                      |
+| Chaux aérienne CL 90      | {lime_kg:.1f}     | Souplesse / perméabilité        |
+| Kaolin                    | {kaolin_kg:.1f}   | Thixotropie / finesse           |
+| Hydrofuge Sika® Poudre    | {hydrofuge_kg:.1f} | Imperméabilité / plasticité     |
 
-st.write("---")
-st.markdown("## 3️⃣ Sand Blending Calculator (Achieve Target ES)")
+---
 
-st.write("""
-Enter the ES of your unclean (crushed) sand, the ES of your clean (washed) sand,
-and your target ES for mortar. Get the recommended blend ratio.
+### ⚙️ Caractéristiques Techniques
+
+- Granulométrie ≤ 1.2 mm  
+- Densité ~1.4 g/cm³  
+- pH ~11–12  
+- Eau d’ajout : ~5–6 L / sac  
+- Rendement : ~18–20 kg/m² pour 10 mm  
+- Adhérence élevée sur supports minéraux  
+- Temps de travail ≥ 2h
+
+---
+
+### 🛠️ Mode d’emploi
+
+1. Support propre, humidifié  
+2. Mélange avec eau selon consistance  
+3. Application par pompe ou machine à projeter  
+4. Finition selon besoin : taloché, gratté, lissé
 """)
-col1, col2, col3 = st.columns(3)
-with col1:
-    es_unclean = st.number_input("Unclean Sand ES", min_value=0.0, max_value=100.0, value=40.0, step=0.1)
-with col2:
-    es_clean = st.number_input("Clean Sand ES", min_value=0.0, max_value=100.0, value=77.0, step=0.1)
-with col3:
-    es_target = st.number_input("Target ES", min_value=40.0, max_value=55.0, value=45.0, step=0.1)
 
-if st.button("Calculate Sand Blend"):
-    ratio_clean, ratio_unclean, message = sand_blend_ratio(es_unclean, es_clean, es_target)
-    if message:
-        st.info(message)
-    else:
-        st.markdown(f"**Mix {ratio_clean*100:.1f}% clean sand and {ratio_unclean*100:.1f}% unclean sand.**")
-        if ratio_clean > 0.3:
-            st.warning("⚠️ Clean sand required is above 30%. Consider finding a better unclean sand or using more clean sand.")
-
-st.write("---")
-st.info("**Recommended ES for mortar sand:** Minimum: 45, Maximum: 55. Most codes recommend staying within this range for proper workability and strength.")
-st.caption("For best results, ensure all components and sand grading meet your project's local norms and requirements.")
+# 🎨 Optional label preview
+with st.expander("🎨 Étiquette Sack Preview"):
+    st.text(f"""
+MORTIER À PROJETER – 25 kg
+Usage : Façade / Sous-enduit / Intérieur
+Formulation : ES 47 / CEM II / CL 90 / Kaolin / Hydrofuge
+Eau recommandée : 5–6 L
+""")
